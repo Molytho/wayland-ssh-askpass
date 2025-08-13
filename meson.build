@@ -16,9 +16,12 @@ sources = [
   'src/main.cpp'
 ]
 
+includes = include_directories('include')
+
 executable(
   'wayland-ssh-askpass',
   sources,
+  include_directories : includes,
   install : true,
   dependencies : dependencies,
 )
