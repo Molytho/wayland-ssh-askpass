@@ -16,8 +16,6 @@
 
 namespace {
     constexpr std::string_view TITLE = "Askpass";
-    constexpr int TARGET_WIDTH       = 250;
-    constexpr int TARGET_HEIGHT      = 300;
 
 // X11 stuff
 #ifdef GDK_WINDOWING_X11
@@ -185,7 +183,6 @@ namespace Askpass {
         set_child(m_grid);
 
         set_title(std::string(TITLE));
-        set_default_size(TARGET_WIDTH, TARGET_HEIGHT);
         set_default_widget(m_ok_button);
     }
 
