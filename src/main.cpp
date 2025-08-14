@@ -8,7 +8,7 @@
 
 namespace {
     constexpr std::string_view APP_ID       = "org.molytho.wayland-ssh-askpass";
-    constexpr const char ALLOWED_BACKENDS[] = "wayland";
+    constexpr const char ALLOWED_BACKENDS[] = "wayland,x11";
 }; // namespace
 
 int main(int argc, char **argv) {

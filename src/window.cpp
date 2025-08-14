@@ -2,6 +2,12 @@
 
 #include <string_view>
 
+// X11 Stuff
+#ifdef GDK_WINDOWING_X11
+# include <X11/Xatom.h>
+# include <gdk/x11/gdkx.h>
+#endif
+
 // Wayland stuff
 #ifdef GDK_WINDOWING_WAYLAND
 # include <gdk/wayland/gdkwayland.h>
@@ -12,6 +18,98 @@ namespace {
     constexpr std::string_view TITLE = "Askpass";
     constexpr int TARGET_WIDTH       = 250;
     constexpr int TARGET_HEIGHT      = 300;
+
+// X11 stuff
+#ifdef GDK_WINDOWING_X11
+    enum Atoms {
+        ATOMS_WM_WINDOW_TYPE,
+        ATOMS_WM_WINDOW_TYPE_DOCK,
+        ATOMS_WM_STATE,
+        ATOMS_WM_STATE_STICKY,
+        ATOMS_WM_STATE_ABOVE,
+        ATOMS_MAX
+    };
+
+    constexpr const char *NEEDED_ATOMS[] = {
+        "_NET_WM_WINDOW_TYPE",
+        "_NET_WM_WINDOW_TYPE_DOCK",
+        "_NET_WM_STATE",
+        "_NET_WM_STATE_STICKY",
+        "_NET_WM_STATE_ABOVE"
+    };
+
+    static_assert(ATOMS_MAX == (sizeof(NEEDED_ATOMS) / sizeof(*NEEDED_ATOMS)));
+
+    void grab_keyboard(Display *xdisplay, Window xwindow) {
+        if (!XGrabKeyboard(xdisplay, xwindow, True, GrabModeAsync, GrabModeAsync, CurrentTime)) {
+            std::cerr << "Failed to grab keyboard focus";
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    void platform_setup_x11(Gtk::Window &window) {
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        auto xdisplay = gdk_x11_display_get_xdisplay(window.get_display()->gobj());
+        auto xrootwindow = gdk_x11_display_get_xrootwindow(window.get_display()->gobj());
+        auto xwindow  = gdk_x11_surface_get_xid(window.get_surface()->gobj());
+        #pragma GCC diagnostic pop
+
+        const auto atoms = [&]() {
+            std::array<Atom, ATOMS_MAX> buffer {};
+            // XInternAtoms is broken and requested a char**
+            XInternAtoms(xdisplay, const_cast<char **>(NEEDED_ATOMS), ATOMS_MAX, false, buffer.data());
+            return buffer;
+        }();
+
+        // Window type
+        {
+            const std::array<Atom, 1> value {atoms[ATOMS_WM_WINDOW_TYPE_DOCK]};
+            XChangeProperty(xdisplay,
+                xwindow,
+                atoms[ATOMS_WM_WINDOW_TYPE],
+                XA_ATOM,
+                32,
+                PropModeReplace,
+                reinterpret_cast<const unsigned char *>(value.data()),
+                value.size());
+        }
+
+        // Window state
+        {
+            const std::array<Atom, 2> value {atoms[ATOMS_WM_STATE_ABOVE], atoms[ATOMS_WM_STATE_STICKY]};
+            XChangeProperty(xdisplay,
+                xwindow,
+                atoms[ATOMS_WM_STATE],
+                XA_ATOM,
+                32,
+                PropModeReplace,
+                reinterpret_cast<const unsigned char *>(value.data()),
+                value.size());
+
+            XClientMessageEvent update_event {
+                .type = ClientMessage,
+                .serial = 0,
+                .send_event = false,
+                .display = nullptr,
+                .window = xwindow,
+                .message_type = atoms[ATOMS_WM_STATE],
+                .format = 32,
+                .data = {},
+            };
+            update_event.data.l[0] = 1; // Add/set property
+            update_event.data.l[1] = static_cast<long>(atoms[ATOMS_WM_STATE_ABOVE]);
+            update_event.data.l[2] = static_cast<long>(atoms[ATOMS_WM_STATE_STICKY]);
+            update_event.data.l[3] = 1; // Normal application
+            if (!XSendEvent(xdisplay, xrootwindow, false, 0, reinterpret_cast<XEvent*>(&update_event))) {
+                std::cerr << "Sending XEvent failed\n";
+                abort();
+            }
+        }
+
+        grab_keyboard(xdisplay, xwindow);
+    }
+#endif
 
 // Wayland stuff
 #ifdef GDK_WINDOWING_WAYLAND
@@ -42,6 +140,11 @@ namespace {
 #ifdef GDK_WINDOWING_WAYLAND
         if (GDK_IS_WAYLAND_DISPLAY(display)) {
             platform_setup_wayland(window);
+        } else
+#endif
+#ifdef GDK_WINDOWING_X11
+        if (GDK_IS_X11_DISPLAY(display)) {
+            platform_setup_x11(window);
         } else
 #endif
         {

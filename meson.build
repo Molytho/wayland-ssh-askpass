@@ -8,7 +8,8 @@ project(
 
 dependencies = [
   dependency('gtkmm-4.0'),
-  dependency('gtk4-layer-shell-0')
+  dependency('gtk4-layer-shell-0'),
+  dependency('x11')
 ]
 
 sources = [
