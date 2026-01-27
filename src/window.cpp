@@ -28,7 +28,7 @@ namespace {
         ATOMS_MAX
     };
 
-    constexpr const char *NEEDED_ATOMS[] = {
+    constexpr std::array NEEDED_ATOMS {
         "_NET_WM_WINDOW_TYPE",
         "_NET_WM_WINDOW_TYPE_DOCK",
         "_NET_WM_STATE",
@@ -36,7 +36,7 @@ namespace {
         "_NET_WM_STATE_ABOVE"
     };
 
-    static_assert(ATOMS_MAX == (sizeof(NEEDED_ATOMS) / sizeof(*NEEDED_ATOMS)));
+    static_assert(ATOMS_MAX == NEEDED_ATOMS.size());
 
     void grab_keyboard(Display *xdisplay, Window xwindow) {
         if (!XGrabKeyboard(xdisplay, xwindow, True, GrabModeAsync, GrabModeAsync, CurrentTime)) {
@@ -56,7 +56,7 @@ namespace {
         const auto atoms = [&]() {
             std::array<Atom, ATOMS_MAX> buffer {};
             // XInternAtoms is broken and requested a char**
-            XInternAtoms(xdisplay, const_cast<char **>(NEEDED_ATOMS), ATOMS_MAX, false, buffer.data());
+            XInternAtoms(xdisplay, const_cast<char **>(NEEDED_ATOMS.data()), ATOMS_MAX, false, buffer.data());
             return buffer;
         }();
 
