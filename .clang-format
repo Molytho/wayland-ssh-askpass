@@ -27,7 +27,9 @@ BreakBeforeBinaryOperators: All
 BreakBeforeBraces: Attach
 BreakBeforeConceptDeclarations: Always
 BreakBeforeInlineASMColon: OnlyMultiline
+BreakBeforeTemplateCloser: true
 BreakBeforeTernaryOperators: true
+BreakBinaryOperations: RespectPrecedence
 BreakConstructorInitializers: AfterColon
 BreakInheritanceList: AfterColon
 BreakStringLiterals: true
@@ -46,6 +48,7 @@ IncludeBlocks: Preserve
 IndentAccessModifiers: false
 IndentCaseBlocks: false
 IndentCaseLabels: false
+IndentExportBlock: true
 IndentExternBlock: Indent
 IndentPPDirectives: AfterHash
 IndentRequiresClause: true
@@ -66,6 +69,7 @@ PPIndentWidth: 1
 PackConstructorInitializers: BinPack
 PenaltyBreakAssignment: 0
 PenaltyBreakBeforeFirstCallParameter: 0
+PenaltyBreakBeforeMemberAccess: 100
 PenaltyBreakComment: 100
 PenaltyBreakFirstLessLess: 0
 PenaltyBreakOpenParenthesis: 0
@@ -76,9 +80,10 @@ PenaltyIndentedWhitespace: 1
 PenaltyExcessCharacter: 1
 PenaltyReturnTypeOnItsOwnLine: 40
 PointerAlignment: Right
-QualifierAlignment: Leave
+QualifierAlignment: Custom
+QualifierOrder: [static, constexpr, inline, const, volatile, restrict, friend, type]
 ReferenceAlignment: Right
-ReflowComments: false
+ReflowComments: IndentOnly
 RequiresClausePosition: OwnLine
 RequiresExpressionIndentation: OuterScope
 SeparateDefinitionBlocks: Always
@@ -105,4 +110,3 @@ SpacesInSquareBrackets: false
 Standard: c++20
 TabWidth: 4
 UseTab: Never
-

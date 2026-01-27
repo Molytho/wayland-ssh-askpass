@@ -35,25 +35,31 @@ namespace Askpass {
         }
     }
 
-    class Model {
+    class Model : public sigc::trackable {
         std::string m_message;
+        int m_exit_status {0};
 
         static void on_succeeded(std::string_view input) {
             std::span<const char> input_span {input.data(), input.size()};
             unbuffered_write_to_stdout(std::as_bytes(input_span));
         }
 
-        static void on_failure() { std::cerr << "Input cancelled by the user\n"; }
+        void on_failure() {
+            std::cerr << "Input cancelled by the user\n";
+            m_exit_status = 1;
+        }
 
     public:
         Model(std::string message) : m_message(std::move(message)) {}
 
         void register_window(WindowInterface auto &window) {
             window.signal_succeeded().connect(sigc::ptr_fun(on_succeeded));
-            window.signal_failure().connect(sigc::ptr_fun(on_failure));
+            window.signal_failure().connect(sigc::mem_fun(*this, &Model::on_failure));
         }
 
-        std::string_view get_message() { return m_message; }
+        std::string_view get_message() const noexcept { return m_message; }
+
+        int exit_status() const noexcept { return m_exit_status; }
     };
 
 } // namespace Askpass

@@ -26,5 +26,8 @@ int main(int argc, char **argv) {
             return {message_stream.str()};
         }
     }();
-    return app->make_window_and_run<Askpass::Window>(0, nullptr, model);
+    if (app->make_window_and_run<Askpass::Window>(0, nullptr, model)) {
+        return EXIT_FAILURE;
+    }
+    return model.exit_status();
 }
