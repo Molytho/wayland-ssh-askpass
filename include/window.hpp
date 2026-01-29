@@ -35,7 +35,7 @@ namespace Askpass {
         void on_realize() final;
         bool on_close_request() final;
         void on_ok_button_clicked();
-        void on_cancel_butto_clicked();
+        bool on_key_pressed(guint keyval, guint, Gdk::ModifierType state);
 
         void emit_succeeded();
         void emit_failure();

@@ -2,6 +2,8 @@
 
 #include <string_view>
 
+#include <gdk/gdkkeysyms.h>
+
 // X11 Stuff
 #ifdef GDK_WINDOWING_X11
 # include <X11/Xatom.h>
@@ -184,6 +186,13 @@ namespace Askpass {
 
         set_title(std::string(TITLE));
         set_default_widget(m_ok_button);
+
+        add_controller([&]() {
+            auto key_controller = Gtk::EventControllerKey::create();
+            key_controller->set_propagation_phase(Gtk::PropagationPhase::BUBBLE);
+            key_controller->signal_key_pressed().connect(sigc::mem_fun(*this, &Window::on_key_pressed), true);
+            return key_controller;
+        }());
     }
 
     Window::Window(Model &model) : Window(std::string(model.get_message())) {
@@ -205,6 +214,14 @@ namespace Askpass {
     void Window::on_ok_button_clicked() {
         emit_succeeded();
         close();
+    }
+
+    bool Window::on_key_pressed(guint keyval, guint, Gdk::ModifierType) {
+        if (keyval == GDK_KEY_Escape) {
+            close();
+            return true;
+        }
+        return false;
     }
 
     void Window::emit_succeeded() {
