@@ -1,5 +1,7 @@
 #include "window.hpp"
 
+#include <array>
+#include <span>
 #include <string_view>
 
 #include <gdk/gdkkeysyms.h>
@@ -23,22 +25,91 @@ namespace {
 #ifdef GDK_WINDOWING_X11
     enum Atoms {
         ATOMS_WM_WINDOW_TYPE,
-        ATOMS_WM_WINDOW_TYPE_DOCK,
+        ATOMS_WM_WINDOW_TYPE_DIALOG,
         ATOMS_WM_STATE,
         ATOMS_WM_STATE_STICKY,
         ATOMS_WM_STATE_ABOVE,
+        ATOMS_WM_STATE_MODAL,
         ATOMS_MAX
     };
 
-    constexpr std::array NEEDED_ATOMS {
-        "_NET_WM_WINDOW_TYPE",
-        "_NET_WM_WINDOW_TYPE_DOCK",
+    constexpr std::array NEEDED_ATOMS {"_NET_WM_WINDOW_TYPE",
+        "_NET_WM_WINDOW_TYPE_DIALOG",
         "_NET_WM_STATE",
         "_NET_WM_STATE_STICKY",
-        "_NET_WM_STATE_ABOVE"
-    };
-
+        "_NET_WM_STATE_ABOVE",
+        "_NET_WM_STATE_MODAL"};
     static_assert(ATOMS_MAX == NEEDED_ATOMS.size());
+
+    std::array<Atom, ATOMS_MAX> get_atoms(Display *xdisplay) {
+        std::array<Atom, ATOMS_MAX> buffer {};
+        // XInternAtoms is broken and requested a char**
+        XInternAtoms(xdisplay, const_cast<char **>(NEEDED_ATOMS.data()), ATOMS_MAX, false, buffer.data());
+        return buffer;
+    }
+
+    void set_atom(Display *xdisplay, Window xwindow, Atom key, std::span<const Atom> values) {
+        XChangeProperty(xdisplay,
+            xwindow,
+            key,
+            XA_ATOM,
+            32,
+            PropModeReplace,
+            reinterpret_cast<const unsigned char *>(values.data()),
+            values.size());
+    }
+
+    void set_atom(Display *xdisplay, Window xwindow, Atom key, Atom value) {
+        std::array values {value};
+        set_atom(xdisplay, xwindow, key, values);
+    }
+
+    void set_window_state(Display *xdisplay, Window xwindow, Atom key, std::span<const Atom> values) {
+        set_atom(xdisplay, xwindow, key, values);
+
+        /*XClientMessageEvent update_event {
+            .type         = ClientMessage,
+            .serial       = 0,
+            .send_event   = false,
+            .display      = nullptr,
+            .window       = xwindow,
+            .message_type = key,
+            .format       = 32,
+            .data         = {},
+        };
+        update_event.data.l[0] = 1; // Add/set property
+        update_event.data.l[1] = static_cast<long>(atoms[ATOMS_WM_STATE_ABOVE]);
+        update_event.data.l[2] = static_cast<long>(atoms[ATOMS_WM_STATE_STICKY]);
+        update_event.data.l[3] = 1; // Normal application
+        if (!XSendEvent(xdisplay, xrootwindow, false, 0, reinterpret_cast<XEvent *>(&update_event))) {
+            std::cerr << "Sending XEvent failed\n";
+            abort();
+        }*/
+    }
+
+    void set_override_redirect(Display *xdisplay, Window xwindow) {
+        XSetWindowAttributes attrs {};
+        attrs.override_redirect = True;
+        XChangeWindowAttributes(xdisplay, xwindow, CWOverrideRedirect, &attrs);
+    }
+
+    void set_position(Display *xdisplay, Gtk::Window &window, Window xwindow) {
+        auto default_screen = DefaultScreen(xdisplay);
+        auto display_width  = DisplayWidth(xdisplay, default_screen);
+        auto display_height = DisplayHeight(xdisplay, default_screen);
+
+        auto width_meassurement = window.measure(Gtk::Orientation::HORIZONTAL);
+        auto height_meassurement = window.measure(Gtk::Orientation::VERTICAL);
+
+        XWindowChanges changes {.x = (display_width - width_meassurement.sizes.natural) / 2,
+            .y                     = (display_height - height_meassurement.sizes.natural) / 2,
+            .width                 = {},
+            .height                = {},
+            .border_width          = {},
+            .sibling               = {},
+            .stack_mode            = Above};
+        XConfigureWindow(xdisplay, xwindow, CWX | CWY | CWStackMode, &changes);
+    }
 
     void grab_keyboard(Display *xdisplay, Window xwindow) {
         if (!XGrabKeyboard(xdisplay, xwindow, True, GrabModeAsync, GrabModeAsync, CurrentTime)) {
@@ -48,66 +119,27 @@ namespace {
     }
 
     void platform_setup_x11(Gtk::Window &window) {
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
         auto xdisplay = gdk_x11_display_get_xdisplay(window.get_display()->gobj());
-        auto xrootwindow = gdk_x11_display_get_xrootwindow(window.get_display()->gobj());
-        auto xwindow  = gdk_x11_surface_get_xid(window.get_surface()->gobj());
-        #pragma GCC diagnostic pop
+        // auto xrootwindow = gdk_x11_display_get_xrootwindow(window.get_display()->gobj());
+        auto xwindow = gdk_x11_surface_get_xid(window.get_surface()->gobj());
+# pragma GCC diagnostic pop
 
-        const auto atoms = [&]() {
-            std::array<Atom, ATOMS_MAX> buffer {};
-            // XInternAtoms is broken and requested a char**
-            XInternAtoms(xdisplay, const_cast<char **>(NEEDED_ATOMS.data()), ATOMS_MAX, false, buffer.data());
-            return buffer;
-        }();
-
+        const auto atoms = get_atoms(xdisplay);
+        set_override_redirect(xdisplay, xwindow);
+        set_position(xdisplay, window, xwindow);
         // Window type
-        {
-            const std::array<Atom, 1> value {atoms[ATOMS_WM_WINDOW_TYPE_DOCK]};
-            XChangeProperty(xdisplay,
-                xwindow,
-                atoms[ATOMS_WM_WINDOW_TYPE],
-                XA_ATOM,
-                32,
-                PropModeReplace,
-                reinterpret_cast<const unsigned char *>(value.data()),
-                value.size());
-        }
-
+        set_atom(xdisplay, xwindow, atoms[ATOMS_WM_WINDOW_TYPE], atoms[ATOMS_WM_WINDOW_TYPE_DIALOG]);
         // Window state
-        {
-            const std::array<Atom, 2> value {atoms[ATOMS_WM_STATE_ABOVE], atoms[ATOMS_WM_STATE_STICKY]};
-            XChangeProperty(xdisplay,
-                xwindow,
-                atoms[ATOMS_WM_STATE],
-                XA_ATOM,
-                32,
-                PropModeReplace,
-                reinterpret_cast<const unsigned char *>(value.data()),
-                value.size());
-
-            XClientMessageEvent update_event {
-                .type = ClientMessage,
-                .serial = 0,
-                .send_event = false,
-                .display = nullptr,
-                .window = xwindow,
-                .message_type = atoms[ATOMS_WM_STATE],
-                .format = 32,
-                .data = {},
-            };
-            update_event.data.l[0] = 1; // Add/set property
-            update_event.data.l[1] = static_cast<long>(atoms[ATOMS_WM_STATE_ABOVE]);
-            update_event.data.l[2] = static_cast<long>(atoms[ATOMS_WM_STATE_STICKY]);
-            update_event.data.l[3] = 1; // Normal application
-            if (!XSendEvent(xdisplay, xrootwindow, false, 0, reinterpret_cast<XEvent*>(&update_event))) {
-                std::cerr << "Sending XEvent failed\n";
-                abort();
-            }
-        }
+        const std::array DesiredWindowStates {atoms[ATOMS_WM_STATE_ABOVE],
+            atoms[ATOMS_WM_STATE_STICKY],
+            atoms[ATOMS_WM_STATE_MODAL]};
+        set_window_state(xdisplay, xwindow, atoms[ATOMS_WM_STATE], DesiredWindowStates);
 
         grab_keyboard(xdisplay, xwindow);
+
+        XFlush(xdisplay);
     }
 #endif
 
@@ -143,7 +175,7 @@ namespace {
         } else
 #endif
 #ifdef GDK_WINDOWING_X11
-        if (GDK_IS_X11_DISPLAY(display)) {
+            if (GDK_IS_X11_DISPLAY(display)) {
             platform_setup_x11(window);
         } else
 #endif
@@ -155,7 +187,6 @@ namespace {
 } // namespace
 
 namespace Askpass {
-
     Window::Window(const Glib::ustring &label_text) {
         m_label.set_label(label_text);
         m_label.set_selectable(false);
