@@ -9,6 +9,7 @@
 // X11 Stuff
 #ifdef GDK_WINDOWING_X11
 # include <X11/Xatom.h>
+# include <X11/extensions/Xinerama.h>
 # include <gdk/x11/gdkx.h>
 #endif
 
@@ -93,21 +94,35 @@ namespace {
         XChangeWindowAttributes(xdisplay, xwindow, CWOverrideRedirect, &attrs);
     }
 
-    void set_position(Display *xdisplay, Gtk::Window &window, Window xwindow) {
-        auto default_screen = DefaultScreen(xdisplay);
-        auto display_width  = DisplayWidth(xdisplay, default_screen);
-        auto display_height = DisplayHeight(xdisplay, default_screen);
+    struct xfree_delete {
+        int operator()(void *ptr) const noexcept { return XFree(ptr); }
+    };
 
-        auto width_meassurement = window.measure(Gtk::Orientation::HORIZONTAL);
+    std::pair<std::unique_ptr<XineramaScreenInfo[], xfree_delete>, int> get_xinerama_screens(Display *xdisplay) {
+        int count {};
+        auto ptr = XineramaQueryScreens(xdisplay, &count);
+        return {std::unique_ptr<XineramaScreenInfo[], xfree_delete>(ptr), count};
+    }
+
+    void set_position(Display *xdisplay, Gtk::Window &window, Window xwindow) {
+        const auto [display_x, display_y, display_width, display_height]
+            = [&]() -> std::tuple<short, short, short, short> {
+            if (auto [ptr, count] = get_xinerama_screens(xdisplay); ptr) {
+                assert(count > 0);
+                return {ptr[0].x_org, ptr[0].y_org, ptr[0].width, ptr[0].height};
+            } else {
+                auto default_screen = DefaultScreen(xdisplay);
+                return {0, 0, DisplayWidth(xdisplay, default_screen), DisplayHeight(xdisplay, default_screen)};
+            }
+        }();
+
+        auto width_meassurement  = window.measure(Gtk::Orientation::HORIZONTAL);
         auto height_meassurement = window.measure(Gtk::Orientation::VERTICAL);
 
-        XWindowChanges changes {.x = (display_width - width_meassurement.sizes.natural) / 2,
-            .y                     = (display_height - height_meassurement.sizes.natural) / 2,
-            .width                 = {},
-            .height                = {},
-            .border_width          = {},
-            .sibling               = {},
-            .stack_mode            = Above};
+        auto x = display_x + (display_width - width_meassurement.sizes.natural) / 2;
+        auto y = display_y + (display_height - height_meassurement.sizes.natural) / 2;
+
+        XWindowChanges changes {.x = x, .y = y, .width = {}, .height = {}, .border_width = {}, .sibling = {}, .stack_mode = Above};
         XConfigureWindow(xdisplay, xwindow, CWX | CWY | CWStackMode, &changes);
     }
 
