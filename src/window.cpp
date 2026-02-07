@@ -1,174 +1,50 @@
 #include "window.hpp"
 
-#include <array>
-#include <span>
 #include <string_view>
 
 #include <gdk/gdkkeysyms.h>
 
-// X11 Stuff
-#ifdef GDK_WINDOWING_X11
-# include <X11/Xatom.h>
-# include <gdk/x11/gdkx.h>
-#endif
-
-// Wayland stuff
 #ifdef GDK_WINDOWING_WAYLAND
 # include <gdk/wayland/gdkwayland.h>
-# include <gtk4-layer-shell.h>
+
+void platform_setup_wayland(Gtk::Window &window);
+
+bool is_wayland_display(Gdk::Display *display) {
+    return GDK_IS_WAYLAND_DISPLAY(display->gobj());
+}
+#else
+[[maybe_unused]] void platform_setup_wayland(Gtk::Window &) {}
+
+bool is_wayland_display(Gdk::Display *) {
+    return false;
+}
+#endif
+
+#ifdef GDK_WINDOWING_X11
+# include <gdk/x11/gdkx.h>
+
+void platform_setup_x11(Gtk::Window &window);
+
+bool is_x11_display(Gdk::Display *display) {
+    return GDK_IS_X11_DISPLAY(display->gobj());
+}
+#else
+[[maybe_unused]] void platform_setup_x11(Gtk::Window &) {}
+
+bool is_x11_display(Gdk::Display *) {
+    return false;
+}
 #endif
 
 namespace {
     constexpr std::string_view TITLE = "Askpass";
 
-// X11 stuff
-#ifdef GDK_WINDOWING_X11
-    enum Atoms {
-        ATOMS_WM_WINDOW_TYPE,
-        ATOMS_WM_WINDOW_TYPE_DIALOG,
-        ATOMS_WM_STATE,
-        ATOMS_WM_STATE_STICKY,
-        ATOMS_WM_STATE_ABOVE,
-        ATOMS_WM_STATE_MODAL,
-        ATOMS_MAX
-    };
-
-    constexpr std::array NEEDED_ATOMS {"_NET_WM_WINDOW_TYPE",
-        "_NET_WM_WINDOW_TYPE_DIALOG",
-        "_NET_WM_STATE",
-        "_NET_WM_STATE_STICKY",
-        "_NET_WM_STATE_ABOVE",
-        "_NET_WM_STATE_MODAL"};
-    static_assert(ATOMS_MAX == NEEDED_ATOMS.size());
-
-    std::array<Atom, ATOMS_MAX> get_atoms(Display *xdisplay) {
-        std::array<Atom, ATOMS_MAX> buffer {};
-        // XInternAtoms is broken and requested a char**
-        XInternAtoms(xdisplay, const_cast<char **>(NEEDED_ATOMS.data()), ATOMS_MAX, false, buffer.data());
-        return buffer;
-    }
-
-    void set_atom(Display *xdisplay, Window xwindow, Atom key, std::span<const Atom> values) {
-        XChangeProperty(xdisplay,
-            xwindow,
-            key,
-            XA_ATOM,
-            32,
-            PropModeReplace,
-            reinterpret_cast<const unsigned char *>(values.data()),
-            values.size());
-    }
-
-    void set_window_state(Display *xdisplay, Window xwindow, Atom key, std::span<const Atom> values) {
-        set_atom(xdisplay, xwindow, key, values);
-    }
-
-    void grab_keyboard(Display *xdisplay, Window xwindow) {
-        if (auto res = XGrabKeyboard(xdisplay, xwindow, True, GrabModeAsync, GrabModeAsync, CurrentTime);
-            res != GrabSuccess) {
-            std::cerr << "Failed to grab keyboard focus";
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    void grab_pointer(Display *xdisplay, Window xwindow) {
-        // Everything
-        constexpr int GrabMask
-            = ButtonPressMask
-              | ButtonReleaseMask
-              | EnterWindowMask
-              | LeaveWindowMask
-              | PointerMotionMask
-              | PointerMotionHintMask
-              | Button1MotionMask
-              | Button2MotionMask
-              | Button3MotionMask
-              | Button4MotionMask
-              | Button5MotionMask
-              | ButtonMotionMask
-              | KeymapStateMask;
-        if (auto res = XGrabPointer(xdisplay, xwindow, True, GrabMask, GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
-            res != GrabSuccess) {
-            std::cerr << "Failed to grab keyboard focus";
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    gboolean on_xevent(GdkX11Display *display, gpointer xevent, gpointer user_data) {
-        if (auto event = static_cast<XEvent *>(xevent); event->type == Expose) {
-            auto surface = static_cast<GdkSurface *>(user_data);
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-            auto xdisplay = gdk_x11_display_get_xdisplay(display);
-            auto xwindow  = gdk_x11_surface_get_xid(surface);
-# pragma GCC diagnostic pop
-            grab_keyboard(xdisplay, xwindow);
-            grab_pointer(xdisplay, xwindow);
-        }
-        return false;
-    }
-
-    void platform_setup_x11(Gtk::Window &window) {
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-        auto xdisplay    = gdk_x11_display_get_xdisplay(window.get_display()->gobj());
-        auto xrootwindow = gdk_x11_display_get_xrootwindow(window.get_display()->gobj());
-        auto xwindow     = gdk_x11_surface_get_xid(window.get_surface()->gobj());
-
-        const auto atoms = get_atoms(xdisplay);
-
-        XSetTransientForHint(xdisplay, xwindow, xrootwindow);
-        const std::array DesiredWindowStates {atoms[ATOMS_WM_STATE_ABOVE],
-            atoms[ATOMS_WM_STATE_STICKY],
-            atoms[ATOMS_WM_STATE_MODAL]};
-        set_window_state(xdisplay, xwindow, atoms[ATOMS_WM_STATE], DesiredWindowStates);
-
-        auto x11_surface = GDK_X11_SURFACE(window.get_surface()->gobj());
-        gdk_x11_surface_move_to_current_desktop(x11_surface);
-
-        GdkX11Display *x11_display = GDK_X11_DISPLAY(window.get_display()->gobj());
-        g_signal_connect_object(x11_display, "xevent", G_CALLBACK(&on_xevent), window.get_surface()->gobj(), G_CONNECT_DEFAULT);
-# pragma GCC diagnostic pop
-    }
-#endif
-
-// Wayland stuff
-#ifdef GDK_WINDOWING_WAYLAND
-    constexpr const char LAYER_NAMESPACE[]            = "Password Dialog";
-    constexpr GtkLayerShellLayer LAYER                = GTK_LAYER_SHELL_LAYER_OVERLAY;
-    constexpr GtkLayerShellKeyboardMode KEYBOARD_MODE = GTK_LAYER_SHELL_KEYBOARD_MODE_EXCLUSIVE;
-
-    void setup_gtk_layer_shell(Gtk::Window &window) {
-        auto gobj = window.gobj();
-        gtk_layer_init_for_window(gobj);
-        gtk_layer_set_namespace(gobj, LAYER_NAMESPACE);
-        gtk_layer_set_layer(gobj, LAYER);
-        gtk_layer_set_keyboard_mode(gobj, KEYBOARD_MODE);
-    }
-
-    void platform_setup_wayland(Askpass::Window &window) {
-        if (gtk_layer_is_supported()) {
-            setup_gtk_layer_shell(window);
-        } else {
-            std::cerr << "This application only supports wlr_layer_shell\n";
-            exit(EXIT_FAILURE);
-        }
-    }
-#endif
-
     void platform_setup(Askpass::Window &window) {
-        auto display = window.get_display()->gobj();
-#ifdef GDK_WINDOWING_WAYLAND
-        if (GDK_IS_WAYLAND_DISPLAY(display)) {
+        if (is_wayland_display(window.get_display().get())) {
             platform_setup_wayland(window);
-        } else
-#endif
-#ifdef GDK_WINDOWING_X11
-            if (GDK_IS_X11_DISPLAY(display)) {
+        } else if (is_x11_display(window.get_display().get())) {
             platform_setup_x11(window);
-        } else
-#endif
-        {
+        } else {
             std::cerr << "Invalid gdk platform\n";
             abort();
         }
