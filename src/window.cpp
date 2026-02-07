@@ -9,7 +9,6 @@
 // X11 Stuff
 #ifdef GDK_WINDOWING_X11
 # include <X11/Xatom.h>
-# include <X11/extensions/Xinerama.h>
 # include <gdk/x11/gdkx.h>
 #endif
 
@@ -60,101 +59,76 @@ namespace {
             values.size());
     }
 
-    void set_atom(Display *xdisplay, Window xwindow, Atom key, Atom value) {
-        std::array values {value};
-        set_atom(xdisplay, xwindow, key, values);
-    }
-
     void set_window_state(Display *xdisplay, Window xwindow, Atom key, std::span<const Atom> values) {
         set_atom(xdisplay, xwindow, key, values);
-
-        /*XClientMessageEvent update_event {
-            .type         = ClientMessage,
-            .serial       = 0,
-            .send_event   = false,
-            .display      = nullptr,
-            .window       = xwindow,
-            .message_type = key,
-            .format       = 32,
-            .data         = {},
-        };
-        update_event.data.l[0] = 1; // Add/set property
-        update_event.data.l[1] = static_cast<long>(atoms[ATOMS_WM_STATE_ABOVE]);
-        update_event.data.l[2] = static_cast<long>(atoms[ATOMS_WM_STATE_STICKY]);
-        update_event.data.l[3] = 1; // Normal application
-        if (!XSendEvent(xdisplay, xrootwindow, false, 0, reinterpret_cast<XEvent *>(&update_event))) {
-            std::cerr << "Sending XEvent failed\n";
-            abort();
-        }*/
-    }
-
-    void set_override_redirect(Display *xdisplay, Window xwindow) {
-        XSetWindowAttributes attrs {};
-        attrs.override_redirect = True;
-        XChangeWindowAttributes(xdisplay, xwindow, CWOverrideRedirect, &attrs);
-    }
-
-    struct xfree_delete {
-        int operator()(void *ptr) const noexcept { return XFree(ptr); }
-    };
-
-    std::pair<std::unique_ptr<XineramaScreenInfo[], xfree_delete>, int> get_xinerama_screens(Display *xdisplay) {
-        int count {};
-        auto ptr = XineramaQueryScreens(xdisplay, &count);
-        return {std::unique_ptr<XineramaScreenInfo[], xfree_delete>(ptr), count};
-    }
-
-    void set_position(Display *xdisplay, Gtk::Window &window, Window xwindow) {
-        const auto [display_x, display_y, display_width, display_height]
-            = [&]() -> std::tuple<short, short, short, short> {
-            if (auto [ptr, count] = get_xinerama_screens(xdisplay); ptr) {
-                assert(count > 0);
-                return {ptr[0].x_org, ptr[0].y_org, ptr[0].width, ptr[0].height};
-            } else {
-                auto default_screen = DefaultScreen(xdisplay);
-                return {0, 0, DisplayWidth(xdisplay, default_screen), DisplayHeight(xdisplay, default_screen)};
-            }
-        }();
-
-        auto width_meassurement  = window.measure(Gtk::Orientation::HORIZONTAL);
-        auto height_meassurement = window.measure(Gtk::Orientation::VERTICAL);
-
-        auto x = display_x + (display_width - width_meassurement.sizes.natural) / 2;
-        auto y = display_y + (display_height - height_meassurement.sizes.natural) / 2;
-
-        XWindowChanges changes {.x = x, .y = y, .width = {}, .height = {}, .border_width = {}, .sibling = {}, .stack_mode = Above};
-        XConfigureWindow(xdisplay, xwindow, CWX | CWY | CWStackMode, &changes);
     }
 
     void grab_keyboard(Display *xdisplay, Window xwindow) {
-        if (!XGrabKeyboard(xdisplay, xwindow, True, GrabModeAsync, GrabModeAsync, CurrentTime)) {
+        if (auto res = XGrabKeyboard(xdisplay, xwindow, True, GrabModeAsync, GrabModeAsync, CurrentTime);
+            res != GrabSuccess) {
             std::cerr << "Failed to grab keyboard focus";
             exit(EXIT_FAILURE);
         }
     }
 
+    void grab_pointer(Display *xdisplay, Window xwindow) {
+        // Everything
+        constexpr int GrabMask
+            = ButtonPressMask
+              | ButtonReleaseMask
+              | EnterWindowMask
+              | LeaveWindowMask
+              | PointerMotionMask
+              | PointerMotionHintMask
+              | Button1MotionMask
+              | Button2MotionMask
+              | Button3MotionMask
+              | Button4MotionMask
+              | Button5MotionMask
+              | ButtonMotionMask
+              | KeymapStateMask;
+        if (auto res = XGrabPointer(xdisplay, xwindow, True, GrabMask, GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
+            res != GrabSuccess) {
+            std::cerr << "Failed to grab keyboard focus";
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    gboolean on_xevent(GdkX11Display *display, gpointer xevent, gpointer user_data) {
+        if (auto event = static_cast<XEvent *>(xevent); event->type == Expose) {
+            auto surface = static_cast<GdkSurface *>(user_data);
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            auto xdisplay = gdk_x11_display_get_xdisplay(display);
+            auto xwindow  = gdk_x11_surface_get_xid(surface);
+# pragma GCC diagnostic pop
+            grab_keyboard(xdisplay, xwindow);
+            grab_pointer(xdisplay, xwindow);
+        }
+        return false;
+    }
+
     void platform_setup_x11(Gtk::Window &window) {
 # pragma GCC diagnostic push
 # pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-        auto xdisplay = gdk_x11_display_get_xdisplay(window.get_display()->gobj());
-        // auto xrootwindow = gdk_x11_display_get_xrootwindow(window.get_display()->gobj());
-        auto xwindow = gdk_x11_surface_get_xid(window.get_surface()->gobj());
-# pragma GCC diagnostic pop
+        auto xdisplay    = gdk_x11_display_get_xdisplay(window.get_display()->gobj());
+        auto xrootwindow = gdk_x11_display_get_xrootwindow(window.get_display()->gobj());
+        auto xwindow     = gdk_x11_surface_get_xid(window.get_surface()->gobj());
 
         const auto atoms = get_atoms(xdisplay);
-        set_override_redirect(xdisplay, xwindow);
-        set_position(xdisplay, window, xwindow);
-        // Window type
-        set_atom(xdisplay, xwindow, atoms[ATOMS_WM_WINDOW_TYPE], atoms[ATOMS_WM_WINDOW_TYPE_DIALOG]);
-        // Window state
+
+        XSetTransientForHint(xdisplay, xwindow, xrootwindow);
         const std::array DesiredWindowStates {atoms[ATOMS_WM_STATE_ABOVE],
             atoms[ATOMS_WM_STATE_STICKY],
             atoms[ATOMS_WM_STATE_MODAL]};
         set_window_state(xdisplay, xwindow, atoms[ATOMS_WM_STATE], DesiredWindowStates);
 
-        grab_keyboard(xdisplay, xwindow);
+        auto x11_surface = GDK_X11_SURFACE(window.get_surface()->gobj());
+        gdk_x11_surface_move_to_current_desktop(x11_surface);
 
-        XFlush(xdisplay);
+        GdkX11Display *x11_display = GDK_X11_DISPLAY(window.get_display()->gobj());
+        g_signal_connect_object(x11_display, "xevent", G_CALLBACK(&on_xevent), window.get_surface()->gobj(), G_CONNECT_DEFAULT);
+# pragma GCC diagnostic pop
     }
 #endif
 
@@ -232,6 +206,9 @@ namespace Askpass {
 
         set_title(std::string(TITLE));
         set_default_widget(m_ok_button);
+        set_decorated(false);
+        set_deletable(false);
+        set_resizable(false);
 
         add_controller([&]() {
             auto key_controller = Gtk::EventControllerKey::create();
@@ -250,6 +227,7 @@ namespace Askpass {
     void Window::on_realize() {
         Base::on_realize();
         platform_setup(*this);
+        present();
     }
 
     bool Window::on_close_request() {
