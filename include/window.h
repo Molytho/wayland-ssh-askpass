@@ -27,9 +27,7 @@ namespace Askpass {
 
         Window(std::string_view string_view);
 
-        Window(auto &model) : Window(model.get_message()) {
-            model.register_window(*this);
-        }
+        Window(auto &model) : Window(model.get_message()) { model.register_window(*this); }
 
         ~Window();
 
