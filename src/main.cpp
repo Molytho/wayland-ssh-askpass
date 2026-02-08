@@ -14,14 +14,20 @@ namespace {
 }; // namespace
 
 std::string build_message(int argc, char **argv) {
-    if (argc == 1) {
-        return "Caller did not provide message";
-    } else {
+    std::string str;
+
+    if (argc > 1) {
         std::stringstream message_stream {};
         message_stream << argv[1];
         std::for_each(&argv[2], &argv[argc], [&](const char *str) { message_stream << ' ' << str; });
-        return std::move(message_stream).str();
+        str = std::move(message_stream).str();
     }
+
+    if (str.empty()) {
+        str = "No message";
+    }
+
+    return str;
 }
 
 int main(int argc, char **argv) {
