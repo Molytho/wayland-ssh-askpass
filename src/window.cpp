@@ -1,8 +1,11 @@
-#include "window.hpp"
+#include "window.h"
 
+#include <iostream>
 #include <string_view>
 
 #include <gdk/gdkkeysyms.h>
+
+#include "exit_codes.h"
 
 #ifdef GDK_WINDOWING_WAYLAND
 # include <gdk/wayland/gdkwayland.h>
@@ -37,7 +40,7 @@ bool is_x11_display(Gdk::Display *) {
 #endif
 
 namespace {
-    constexpr std::string_view TITLE = "Askpass";
+    constexpr std::string_view Title = "Askpass";
 
     void platform_setup(Askpass::Window &window) {
         if (is_wayland_display(window.get_display().get())) {
@@ -46,7 +49,7 @@ namespace {
             platform_setup_x11(window);
         } else {
             std::cerr << "Invalid gdk platform\n";
-            abort();
+            exit(Askpass::ExitCode::InvalidPlatform);
         }
     }
 } // namespace
@@ -80,23 +83,17 @@ namespace Askpass {
         m_grid.attach(m_ok_button, 1, 2);
         set_child(m_grid);
 
-        set_title(std::string(TITLE));
+        set_title(std::string(Title));
         set_default_widget(m_ok_button);
         set_decorated(false);
         set_deletable(false);
         set_resizable(false);
 
-        add_controller([&]() {
-            auto key_controller = Gtk::EventControllerKey::create();
-            key_controller->set_propagation_phase(Gtk::PropagationPhase::BUBBLE);
-            key_controller->signal_key_pressed().connect(sigc::mem_fun(*this, &Window::on_key_pressed), true);
-            return key_controller;
-        }());
+        setup_controllers();
     }
 
-    Window::Window(Model &model) : Window(std::string(model.get_message())) {
-        model.register_window(*this);
-    }
+    Window::Window(std::string_view string_view) :
+            Window(Glib::ustring(string_view.data(), string_view.size())) {}
 
     Window::~Window() = default;
 
@@ -138,6 +135,15 @@ namespace Askpass {
             m_signal_failure.emit();
             m_finished = true;
         }
+    }
+
+    void Window::setup_controllers() {
+        add_controller([&]() {
+            auto key_controller = Gtk::EventControllerKey::create();
+            key_controller->set_propagation_phase(Gtk::PropagationPhase::BUBBLE);
+            key_controller->signal_key_pressed().connect(sigc::mem_fun(*this, &Window::on_key_pressed), true);
+            return key_controller;
+        }());
     }
 
 } // namespace Askpass

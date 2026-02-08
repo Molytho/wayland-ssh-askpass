@@ -15,6 +15,7 @@ dependencies = [
 
 sources = [
   'src/main.cpp',
+  'src/model.cpp',
   'src/window.cpp',
   'src/window-wayland.cpp',
   'src/window-x11.cpp'

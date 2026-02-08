@@ -1,11 +1,11 @@
-#ifndef _WINDOW_HPP
-#define _WINDOW_HPP
-
-#include "model.hpp"
+#ifndef _WINDOW_H
+#define _WINDOW_H
 
 #include <gtkmm.h>
 
 namespace Askpass {
+    using on_succeeded_func_t = void(const std::string_view &input);
+    using on_failure_func_t   = void();
 
     class Window final : public Gtk::ApplicationWindow {
     private:
@@ -24,7 +24,13 @@ namespace Askpass {
 
     public:
         Window(const Glib::ustring &label_text);
-        Window(Model &model);
+
+        Window(std::string_view string_view);
+
+        Window(auto &model) : Window(model.get_message()) {
+            model.register_window(*this);
+        }
+
         ~Window();
 
         sigc::signal<on_succeeded_func_t> signal_succeeded() { return m_signal_succeeded; }
@@ -39,10 +45,9 @@ namespace Askpass {
 
         void emit_succeeded();
         void emit_failure();
+
+        void setup_controllers();
     };
-
-    static_assert(WindowInterface<Window>);
-
 } // namespace Askpass
 
 #endif
