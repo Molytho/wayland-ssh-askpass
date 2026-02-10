@@ -9,6 +9,15 @@
             "args": [],
             "cwd": "${workspaceFolder}/build/",
             "preLaunchTask": "Build wayland-ssh-askpass"
+        },
+        {
+            "type": "lldb-dap",
+            "request": "launch",
+            "name": "Launch wayland-systemd-askpass",
+            "program": "${workspaceFolder}/build/wayland-systemd-askpass",
+            "args": [],
+            "cwd": "${workspaceFolder}/build/",
+            "preLaunchTask": "Build wayland-systemd-askpass"
         }
     ]
 }

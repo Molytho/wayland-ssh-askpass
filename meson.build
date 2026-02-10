@@ -47,3 +47,22 @@ executable(
     install : true,
     dependencies : ssh_askpass_dependencies
 )
+
+
+systemd_askpass_dependencies = common_dependencies + [
+    dependency('boost', modules: ['program_options'])
+]
+
+systemd_askpass_sources = common_sources + [
+    'src/systemd-askpass/main.cpp'
+]
+
+systemd_askpass_includes = common_includes
+
+executable(
+    'wayland-systemd-askpass',
+    systemd_askpass_sources,
+    include_directories : systemd_askpass_includes,
+    install : true,
+    dependencies : systemd_askpass_dependencies
+)

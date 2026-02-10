@@ -8,6 +8,12 @@
             "type": "shell",
             "command": "meson compile -C \"${workspaceFolder}/build\" wayland-ssh-askpass",
             "group": "build",
+        },
+        {
+            "label": "Build wayland-systemd-askpass",
+            "type": "shell",
+            "command": "meson compile -C \"${workspaceFolder}/build\" wayland-systemd-askpass",
+            "group": "build",
         }
     ]
 }
