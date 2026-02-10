@@ -1,5 +1,5 @@
 project(
-    'wayland-ssh-askpass',
+    'wayland-askpasses',
     'cpp',
     version : '1.1',
     meson_version : '>= 1.3.0',
@@ -10,27 +10,40 @@ project(
     ]
 )
 
-dependencies = [
+
+common_dependencies = [
     dependency('gtkmm-4.0'),
     dependency('gtk4-layer-shell-0'),
     dependency('gtk4-x11'),
     dependency('x11')
 ]
 
-sources = [
-    'src/main.cpp',
-    'src/model.cpp',
-    'src/window.cpp',
-    'src/window-wayland.cpp',
-    'src/window-x11.cpp'
+common_sources = [
+    'src/common/window.cpp',
+    'src/common/window-wayland.cpp',
+    'src/common/window-x11.cpp'
 ]
 
-includes = include_directories('include')
+common_includes = [
+    include_directories('include/common')
+]
+
+
+ssh_askpass_dependencies = common_dependencies
+
+ssh_askpass_sources = common_sources + [
+    'src/ssh-askpass/main.cpp',
+    'src/ssh-askpass/model.cpp'
+]
+
+ssh_askpass_includes = common_includes + [
+    include_directories('include/ssh-askpass')
+]
 
 executable(
     'wayland-ssh-askpass',
-    sources,
-    include_directories : includes,
+    ssh_askpass_sources,
+    include_directories : ssh_askpass_includes,
     install : true,
-    dependencies : dependencies
+    dependencies : ssh_askpass_dependencies
 )
