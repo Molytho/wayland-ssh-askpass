@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb-dap",
+            "request": "launch",
+            "name": "Launch wayland-ssh-askpass",
+            "program": "${workspaceFolder}/build/wayland-ssh-askpass",
+            "args": [],
+            "cwd": "${workspaceFolder}/build/",
+            "preLaunchTask": "Build wayland-ssh-askpass"
+        }
+    ]
+}
