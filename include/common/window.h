@@ -3,10 +3,9 @@
 
 #include <gtkmm.h>
 
-namespace Askpass {
-    using on_succeeded_func_t = void(const std::string_view &input);
-    using on_failure_func_t   = void();
+#include "concepts.h"
 
+namespace Askpass {
     class Window final : public Gtk::ApplicationWindow {
     private:
         using Base = Gtk::ApplicationWindow;
@@ -46,6 +45,8 @@ namespace Askpass {
 
         void setup_controllers();
     };
+
+    static_assert(WindowInterface<Window>);
 } // namespace Askpass
 
 #endif

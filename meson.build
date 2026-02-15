@@ -54,10 +54,14 @@ systemd_askpass_dependencies = common_dependencies + [
 ]
 
 systemd_askpass_sources = common_sources + [
-    'src/systemd-askpass/main.cpp'
+    'src/systemd-askpass/main.cpp',
+    'src/systemd-askpass/model.cpp',
+    'src/systemd-askpass/systemd-askpass-context.cpp'
 ]
 
-systemd_askpass_includes = common_includes
+systemd_askpass_includes = common_includes + [
+    include_directories('include/systemd-askpass')
+]
 
 executable(
     'wayland-systemd-askpass',

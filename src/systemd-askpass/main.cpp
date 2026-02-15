@@ -1,27 +1,29 @@
-#include <iostream>
-#include <string>
+#include <fstream>
 
-#include <boost/program_options.hpp>
+#include "model.h"
+#include "systemd-askpass-context.h"
+#include "window.h"
 
-namespace po = boost::program_options;
+namespace {
+    constexpr std::string_view AppId       = "org.molytho.wayland-systemd-askpass";
+    constexpr const char AllowedBackends[] = "wayland,x11";
+}; // namespace
 
 int main(int argc, char **argv) {
     // Declare the supported options.
-    po::options_description desc("Allowed options");
-    desc.add_options()
-        ("Ask.Message", po::value<std::string>(), "Message to show")
-        ("Ask.PID", po::value<int>(), "PID of sender")
-        ("Ask.Echo", po::value<int>(), "Whether the input should be echoed")
-        ("Ask.Socket", po::value<std::string>(), "The answer socket");
-
-    po::variables_map vm;
     if (argc > 1) {
-        po::store(po::parse_config_file(argv[1], desc, true), vm);
-    }
-    po::notify(vm);
+        Askpass::Model model = [&]() {
+            std::ifstream askpass_file(argv[1]);
+            auto context = Askpass::SystemdAskpassContext::from_askpass_file(askpass_file);
+            return Askpass::Model {std::move(context)};
+        }();
 
-    if (vm.count("Ask.Message")) {
-        std::cout << vm["Ask.Message"].as<std::string>() << "\n";
+        gdk_set_allowed_backends(AllowedBackends);
+        auto app = Gtk::Application::create(std::string(AppId));
+        if (app->make_window_and_run<Askpass::Window>(0, nullptr, model)) {
+            return static_cast<int>(Askpass::ExitCode::Unknown);
+        }
+        return static_cast<int>(model.exit_status());
     }
 
     return 0;
