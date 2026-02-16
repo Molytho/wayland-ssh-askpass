@@ -9,8 +9,7 @@
 #include <string>
 
 namespace {
-    constexpr std::string_view AppId       = "org.molytho.wayland-ssh-askpass";
-    constexpr const char AllowedBackends[] = "wayland,x11";
+    constexpr std::string_view AppId = "org.molytho.wayland-ssh-askpass";
 }; // namespace
 
 std::string build_message(int argc, char **argv) {
@@ -31,11 +30,7 @@ std::string build_message(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-    gdk_set_allowed_backends(AllowedBackends);
-    auto app = Gtk::Application::create(std::string(AppId));
     Askpass::Model model = build_message(argc, argv);
-    if (app->make_window_and_run<Askpass::Window>(0, nullptr, model)) {
-        return static_cast<int>(Askpass::ExitCode::Unknown);
-    }
+    Askpass::make_and_run_window(AppId, model);
     return static_cast<int>(model.exit_status());
 }

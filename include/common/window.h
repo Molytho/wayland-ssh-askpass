@@ -4,6 +4,7 @@
 #include <gtkmm.h>
 
 #include "concepts.h"
+#include "exit_codes.h"
 
 namespace Askpass {
     class Window final : public Gtk::ApplicationWindow {
@@ -49,6 +50,15 @@ namespace Askpass {
     };
 
     static_assert(WindowInterface<Window>);
+
+    void make_and_run_window(std::string_view app_id, WindowModelInterface<Window> auto &model) {
+        static constexpr const char AllowedBackends[] = "wayland,x11";
+        gdk_set_allowed_backends(AllowedBackends);
+        auto app = Gtk::Application::create(std::string(app_id));
+        if (app->make_window_and_run<Askpass::Window>(0, nullptr, model)) {
+            return exit(ExitCode::Unknown);
+        }
+    }
 } // namespace Askpass
 
 #endif
