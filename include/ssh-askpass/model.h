@@ -25,7 +25,7 @@ namespace Askpass {
             window.signal_failure().connect(sigc::mem_fun(*this, &Model::on_failure));
         }
 
-        constexpr std::string_view get_message() const noexcept { return m_message; }
+        constexpr std::string_view message() const noexcept { return m_message; }
 
         constexpr ExitCode exit_status() const noexcept { return m_exit_status; }
     };
