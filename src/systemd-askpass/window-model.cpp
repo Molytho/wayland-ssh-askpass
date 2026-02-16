@@ -1,4 +1,4 @@
-#include "model.h"
+#include "window-model.h"
 
 #include <span>
 #include <string_view>
@@ -30,15 +30,16 @@ namespace {
 } // namespace
 
 namespace Askpass {
-    void Model::on_succeeded(std::string_view input) {
+    void WindowModel::on_succeeded(std::string_view input) {
         write_answer(m_context->answer_socket(), true, input);
         m_exit_status = ExitCode::Success;
     }
 
-    void Model::on_failure() {
+    void WindowModel::on_failure() {
         write_answer(m_context->answer_socket(), false, std::string_view {});
         m_exit_status = ExitCode::Cancelled;
     }
 
-    Model::Model(std::unique_ptr<SystemdAskpassContext> context) : m_context(std::move(context)) {}
+    WindowModel::WindowModel(std::unique_ptr<SystemdAskpassContext> context) :
+            m_context(std::move(context)) {}
 } // namespace Askpass

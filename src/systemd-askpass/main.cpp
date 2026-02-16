@@ -1,6 +1,6 @@
 #include <fstream>
 
-#include "model.h"
+#include "window-model.h"
 #include "systemd-askpass-context.h"
 #include "window.h"
 
@@ -12,10 +12,10 @@ namespace {
 int main(int argc, char **argv) {
     // Declare the supported options.
     if (argc > 1) {
-        Askpass::Model model = [&]() {
+        Askpass::WindowModel model = [&]() {
             std::ifstream askpass_file(argv[1]);
             auto context = Askpass::SystemdAskpassContext::from_askpass_file(askpass_file);
-            return Askpass::Model {std::move(context)};
+            return Askpass::WindowModel {std::move(context)};
         }();
 
         gdk_set_allowed_backends(AllowedBackends);

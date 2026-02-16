@@ -55,7 +55,7 @@ systemd_askpass_dependencies = common_dependencies + [
 
 systemd_askpass_sources = common_sources + [
     'src/systemd-askpass/main.cpp',
-    'src/systemd-askpass/model.cpp',
+    'src/systemd-askpass/window-model.cpp',
     'src/systemd-askpass/systemd-askpass-context.cpp'
 ]
 

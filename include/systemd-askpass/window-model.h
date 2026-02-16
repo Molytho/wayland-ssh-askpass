@@ -10,7 +10,7 @@
 #include "systemd-askpass-context.h"
 
 namespace Askpass {
-    class Model : public sigc::trackable {
+    class WindowModel : public sigc::trackable {
         std::unique_ptr<SystemdAskpassContext> m_context;
         ExitCode m_exit_status {0};
 
@@ -18,11 +18,11 @@ namespace Askpass {
         void on_failure();
 
     public:
-        explicit Model(std::unique_ptr<SystemdAskpassContext> context);
+        explicit WindowModel(std::unique_ptr<SystemdAskpassContext> context);
 
         void register_window(WindowInterface auto &window) {
-            window.signal_succeeded().connect(sigc::mem_fun(*this, &Model::on_succeeded));
-            window.signal_failure().connect(sigc::mem_fun(*this, &Model::on_failure));
+            window.signal_succeeded().connect(sigc::mem_fun(*this, &WindowModel::on_succeeded));
+            window.signal_failure().connect(sigc::mem_fun(*this, &WindowModel::on_failure));
         }
 
         std::string_view message() const noexcept { return m_context->message(); }
