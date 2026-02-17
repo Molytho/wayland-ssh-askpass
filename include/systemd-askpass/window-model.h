@@ -1,5 +1,5 @@
-#ifndef _MODEL_H
-#define _MODEL_H
+#ifndef WINDOW_MODEL_H
+#define WINDOW_MODEL_H
 
 #include <string_view>
 
