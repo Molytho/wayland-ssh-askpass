@@ -45,6 +45,7 @@ executable(
     ssh_askpass_sources,
     include_directories : ssh_askpass_includes,
     install : true,
+    install_tag: 'ssh-askpass',
     dependencies : ssh_askpass_dependencies
 )
 
@@ -69,5 +70,6 @@ executable(
     systemd_askpass_sources,
     include_directories : systemd_askpass_includes,
     install : true,
+    install_tag: 'systemd-askpass',
     dependencies : systemd_askpass_dependencies
 )
