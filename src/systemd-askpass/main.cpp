@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include <glib-unix.h>
+
 #include "model.h"
 #include "window-model.h"
 #include "window.h"
@@ -37,9 +39,7 @@ public:
         return m_application->run(argc, argv);
     }
 
-    void stop() {
-        m_application->release();
-    }
+    void stop() { m_application->release(); }
 };
 
 static_assert(Askpass::UiInterface<UiManager>);
@@ -68,6 +68,16 @@ int main(int argc, char **argv) {
         }
         return;
     });
+
+    // Don't need to remove it since ui_manager is alive while the MainLoop runs
+    g_unix_signal_add(
+        SIGTERM,
+        [](gpointer user_data) -> gboolean {
+            auto ui_manager = static_cast<UiManager *>(user_data);
+            ui_manager->stop();
+            return false;
+        },
+        &ui_manager);
 
     return ui_manager.run(argc, argv);
 }
