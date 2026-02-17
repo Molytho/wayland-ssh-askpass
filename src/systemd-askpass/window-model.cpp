@@ -3,11 +3,11 @@
 #include <span>
 #include <string_view>
 #include <sys/uio.h>
-#include <system_error>
+#include <sys/socket.h>
 
 #include <sigc++/signal.h>
 
-#include <sys/socket.h>
+#include "macros.h"
 
 namespace {
     void write_answer(int socket_fd, bool success, std::span<const std::byte> data) {
@@ -18,9 +18,7 @@ namespace {
         };
 
         ssize_t res = writev(socket_fd, vecs.data(), vecs.size());
-        if (res < 0) {
-            throw std::system_error(errno, std::system_category());
-        }
+        throw_system_error_if(res < 0);
     }
 
     void write_answer(int socket_fd, bool success, std::string_view password) {

@@ -1,12 +1,13 @@
 #include "systemd-askpass-context.h"
 
 #include <span>
-#include <system_error>
 
 #include <boost/program_options.hpp>
 
 #include <sys/socket.h>
 #include <sys/un.h>
+
+#include "macros.h"
 
 namespace po = boost::program_options;
 
@@ -51,9 +52,7 @@ namespace {
         }();
 
         wrapper::unique_fd s {socket(AF_UNIX, SOCK_DGRAM, 0)};
-        if (s.get() < 0) {
-            throw std::system_error(errno, std::system_category());
-        }
+        throw_system_error_if(s.get() < 0);
         if (connect(s.get(), reinterpret_cast<const sockaddr *>(&addr), sizeof(addr)) < 0) {
             throw std::system_error(errno, std::system_category());
         }

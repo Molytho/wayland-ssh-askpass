@@ -6,19 +6,17 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <system_error>
 
 #include <sigc++/signal.h>
+
+#include "macros.h"
 
 namespace {
     void unbuffered_write_to_stdout(std::span<const std::byte> data) {
         while (!data.empty()) {
             size_t byte_to_write = std::min<std::size_t>(data.size(), std::numeric_limits<ssize_t>::max());
             ssize_t result = write(1, data.data(), byte_to_write);
-            if (result < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-                throw std::system_error(errno, std::system_category());
-            }
-
+            throw_system_error_if(result < 0 && errno != EAGAIN && errno != EWOULDBLOCK);
             data = data.subspan(result);
         }
     }

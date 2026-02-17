@@ -3,6 +3,8 @@
 #include <cassert>
 #include <sstream>
 
+#include "macros.h"
+
 namespace {
     std::string read_gio_file(Gio::File &file) {
         auto input_stream = file.read();
@@ -12,18 +14,14 @@ namespace {
         buffer.resize(size_hint + 1);
 
         gssize bytes_read = input_stream->read(buffer.data(), buffer.size());
-        if (bytes_read < 0) {
-            std::abort();
-        }
+        abort_if(bytes_read < 0);
 
         // File size change. Unlucky :(
         constexpr size_t SizeIncreaseOnReadNotEOF = 256;
         while (gsize(bytes_read) == buffer.size()) {
             buffer.resize(buffer.size() + SizeIncreaseOnReadNotEOF);
             gssize read = input_stream->read(buffer.data() + bytes_read, SizeIncreaseOnReadNotEOF);
-            if (read < 0) {
-                std::abort();
-            }
+            abort_if(read < 0);
             bytes_read += read;
         }
 
@@ -43,6 +41,7 @@ namespace Askpass::detail {
     }
 } // namespace Askpass::detail
 
-guint std::hash<Askpass::detail::AskpassFileImpl>::operator()(const Askpass::detail::AskpassFileImpl &file) const noexcept {
+guint std::hash<Askpass::detail::AskpassFileImpl>::operator()(
+    const Askpass::detail::AskpassFileImpl &file) const noexcept {
     return file.file->hash();
 };
