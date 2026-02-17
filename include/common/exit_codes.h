@@ -4,7 +4,7 @@
 #include <cstdlib>
 
 namespace Askpass {
-    enum class ExitCode : int { Success = 0, Cancelled = 1, InvalidPlatform = 254, Unknown = 255 };
+    enum class ExitCode : int { Success = 0, Cancelled = 1, RuntimeDirectoryUnset = 253, InvalidPlatform = 254, Unknown = 255 };
 
     [[noreturn]] inline void exit(ExitCode code) {
         std::exit(static_cast<int>(code));

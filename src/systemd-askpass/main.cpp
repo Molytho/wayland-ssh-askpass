@@ -1,4 +1,5 @@
-#include <iostream>
+#include <filesystem>
+#include <string_view>
 
 #include <glib-unix.h>
 
@@ -7,7 +8,12 @@
 #include "window.h"
 
 namespace {
-    constexpr std::string_view AppId = "org.molytho.wayland-systemd-askpass";
+    constexpr std::string_view AppId       = "org.molytho.wayland-systemd-askpass";
+    constexpr char XdgRuntimeDirVariable[] = "XDG_RUNTIME_DIR";
+
+    std::string_view get_xdg_runtime_dir() {
+        return getenv(XdgRuntimeDirVariable);
+    }
 }; // namespace
 
 class UiManager : public sigc::trackable {
@@ -44,30 +50,83 @@ public:
 
 static_assert(Askpass::UiInterface<UiManager>);
 
+auto get_askpass_directory_gio_file() {
+    std::filesystem::path runtime_dir = get_xdg_runtime_dir();
+    if (runtime_dir.empty()) {
+        exit(Askpass::ExitCode::RuntimeDirectoryUnset);
+    }
+    runtime_dir /= "systemd/ask-password";
+
+    return Gio::File::create_for_path(runtime_dir.native());
+}
+
+class AskpassDirectorMonitor : public sigc::trackable {
+    Askpass::Model<UiManager> &m_model;
+    Glib::RefPtr<Gio::File> m_askpass_directory;
+    Glib::RefPtr<Gio::FileMonitor> m_file_monitor;
+    bool m_directory_enumerated {false};
+    bool m_idle_signal_installed {false};
+
+    void enumerate_directory() {
+        auto enumerator = m_askpass_directory->enumerate_children(
+            G_FILE_ATTRIBUTE_STANDARD_NAME "," G_FILE_ATTRIBUTE_STANDARD_TYPE);
+        for (auto file = enumerator->next_file(); file; file = enumerator->next_file()) {
+            if (file->get_file_type() == Gio::FileType::REGULAR && file->get_name().starts_with("ask.")) {
+                m_model.on_file_created(enumerator->get_child(file));
+            }
+        }
+
+        enqueue_events_ended_signal();
+        m_directory_enumerated = true;
+    }
+
+    void events_ended_signal() {
+        m_model.on_file_events_ended();
+        m_idle_signal_installed = false;
+    }
+
+    void enqueue_events_ended_signal() {
+        if (!m_idle_signal_installed) {
+            Glib::signal_idle().connect_once(sigc::mem_fun(*this, &AskpassDirectorMonitor::events_ended_signal));
+            m_idle_signal_installed = true;
+        }
+    }
+
+    void on_signal_changed(const Glib::RefPtr<Gio::File> &file, const Glib::RefPtr<Gio::File> &,
+        Gio::FileMonitor::Event event) {
+        // Gio::FileMonitor behaves weirdly when the directory does not exists.
+        // We can't know if this event is caused by the ask-password directory or an ask-password file in the directory
+        assert(file);
+        auto file_name = file->get_basename();
+        if (file_name == "ask-password") {
+            if (!m_directory_enumerated && event == Gio::FileMonitor::Event::CREATED) {
+                enumerate_directory();
+            } else if (event == Gio::FileMonitor::Event::DELETED) {
+                m_directory_enumerated = false;
+            }
+        } else if (file_name.starts_with("ask.")) {
+            if (event == Gio::FileMonitor::Event::CREATED) {
+                m_model.on_file_created(file);
+                enqueue_events_ended_signal();
+            } else if (event == Gio::FileMonitor::Event::DELETED) {
+                m_model.on_file_deleted(file);
+            }
+        }
+    }
+
+public:
+    AskpassDirectorMonitor(Askpass::Model<UiManager> &model) :
+            m_model(model), m_askpass_directory(get_askpass_directory_gio_file()),
+            m_file_monitor(m_askpass_directory->monitor_directory()) {
+        m_file_monitor->signal_changed().connect(sigc::mem_fun(*this, &AskpassDirectorMonitor::on_signal_changed));
+        enumerate_directory();
+    }
+};
+
 int main(int argc, char **argv) {
     UiManager ui_manager {};
     Askpass::Model model {ui_manager};
-
-    auto askpass_dir = Gio::File::create_for_path("/run/user/1000/systemd/ask-password/");
-    auto monitor     = askpass_dir->monitor_directory();
-    monitor->signal_changed().connect([&]([[maybe_unused]] const Glib::RefPtr<Gio::File> &file1,
-                                          [[maybe_unused]] const Glib::RefPtr<Gio::File> &file2,
-                                          [[maybe_unused]] Gio::FileMonitor::Event event) {
-        std::cout << static_cast<int>(event) << '\n';
-        std::cout << file1->get_basename() << '\n';
-        if (event == Gio::FileMonitor::Event::CREATED) {
-            if (file1->get_basename().starts_with("ask.")) {
-                model.on_file_created({file1});
-            }
-        } else if (event == Gio::FileMonitor::Event::DELETED) {
-            if (file1->get_basename().starts_with("ask.")) {
-                model.on_file_deleted({file1});
-            }
-        } else if (event == Gio::FileMonitor::Event::CHANGES_DONE_HINT) {
-            model.on_file_events_ended();
-        }
-        return;
-    });
+    AskpassDirectorMonitor monitor {model};
 
     // Don't need to remove it since ui_manager is alive while the MainLoop runs
     g_unix_signal_add(

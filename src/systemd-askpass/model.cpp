@@ -16,7 +16,7 @@ namespace {
         gssize bytes_read = input_stream->read(buffer.data(), buffer.size());
         abort_if(bytes_read < 0);
 
-        // File size change. Unlucky :(
+        // File size changed. Unlucky :(
         constexpr size_t SizeIncreaseOnReadNotEOF = 256;
         while (gsize(bytes_read) == buffer.size()) {
             buffer.resize(buffer.size() + SizeIncreaseOnReadNotEOF);
@@ -31,6 +31,8 @@ namespace {
 } // namespace
 
 namespace Askpass::detail {
+    AskpassFileImpl::AskpassFileImpl(Glib::RefPtr<Gio::File> pfile) : file(pfile) {}
+
     bool operator==(const AskpassFileImpl &lhs, const AskpassFileImpl &rhs) noexcept {
         return lhs.file->equal(rhs.file);
     }

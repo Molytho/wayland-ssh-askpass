@@ -13,6 +13,8 @@
 namespace Askpass::detail {
     struct AskpassFileImpl {
         Glib::RefPtr<Gio::File> file;
+
+        AskpassFileImpl(Glib::RefPtr<Gio::File> file);
     };
 
     bool operator==(const AskpassFileImpl &lhs, const AskpassFileImpl &rhs) noexcept;
