@@ -74,13 +74,16 @@ namespace Askpass {
     class Model : public sigc::trackable {
         struct run_context {
             WindowModel window_model;
-            sigc::scoped_connection timeout_slot;
             AskpassFile current_file;
+            sigc::scoped_connection timeout_slot {};
+
+            run_context(std::unique_ptr<SystemdAskpassContext> askpass_context, AskpassFile file) :
+                    window_model(std::move(askpass_context)), current_file(std::move(file)) {}
         };
 
         T &m_ui_manager;
         FileStorage<AskpassFile> m_current_askpass_files;
-        std::optional<run_context> m_run_context;
+        std::unique_ptr<run_context> m_run_context;
 
         static unsigned int calculate_timeout(time_t microseconds) {
             if (microseconds == 0) {
@@ -94,7 +97,7 @@ namespace Askpass {
             return std::max<unsigned int>(0, (microseconds / 1000) - current_milli_sec);
         }
 
-        std::optional<std::pair<WindowModel, AskpassFile>> make_next_window_model() {
+        std::unique_ptr<run_context> make_next_window_model() {
             while (!m_current_askpass_files.empty()) {
                 AskpassFile file = m_current_askpass_files.dequeue_file();
                 std::unique_ptr<SystemdAskpassContext> context;
@@ -112,19 +115,19 @@ namespace Askpass {
                     std::cout << "Askpass process already disappeared\n";
                     continue;
                 }
-                return std::make_pair(WindowModel(std::move(context)), std::move(file));
+                return std::make_unique<run_context>(std::move(context), std::move(file));
             }
             return {};
         }
 
         void check_spawn_window() {
-            if (std::optional<std::pair<WindowModel, AskpassFile>> window_context;
-                !m_run_context.has_value() && (window_context = make_next_window_model())) {
-                auto &[window_model, file] = *window_context;
-                m_ui_manager.spawn_window(window_model);
-                auto timeout_slot = m_ui_manager.set_timeout(calculate_timeout(window_model.timeout()),
-                    sigc::mem_fun(*this, &Model::on_timeout));
-                m_run_context.emplace(std::move(window_model), timeout_slot, std::move(file));
+            if (std::unique_ptr<run_context> window_context;
+                !m_run_context && (window_context = make_next_window_model())) {
+                m_ui_manager.spawn_window(window_context->window_model);
+                window_context->timeout_slot
+                    = m_ui_manager.set_timeout(calculate_timeout(window_context->window_model.timeout()),
+                        sigc::mem_fun(*this, &Model::on_timeout));
+                m_run_context = std::move(window_context);
             }
         }
 

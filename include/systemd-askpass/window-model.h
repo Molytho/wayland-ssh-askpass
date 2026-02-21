@@ -20,6 +20,8 @@ namespace Askpass {
     public:
         explicit WindowModel(std::unique_ptr<SystemdAskpassContext> context);
 
+        WindowModel(const WindowModel &) = delete;
+
         void register_window(WindowInterface auto &window) {
             window.signal_succeeded().connect(sigc::mem_fun(*this, &WindowModel::on_succeeded));
             window.signal_failure().connect(sigc::mem_fun(*this, &WindowModel::on_failure));
