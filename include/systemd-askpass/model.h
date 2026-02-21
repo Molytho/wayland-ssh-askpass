@@ -72,10 +72,14 @@ namespace Askpass {
 
     template<UiInterface T>
     class Model : public sigc::trackable {
-        FileStorage<AskpassFile> m_current_askpass_files;
-        std::optional<WindowModel> m_run_window_model;
-        sigc::scoped_connection m_run_window_timeout;
+        struct run_context {
+            WindowModel window_model;
+            sigc::scoped_connection timeout_slot;
+        };
+
         T &m_ui_manager;
+        FileStorage<AskpassFile> m_current_askpass_files;
+        std::optional<run_context> m_run_context;
 
         static unsigned int calculate_timeout(time_t microseconds) {
             if (microseconds == 0) {
@@ -114,12 +118,11 @@ namespace Askpass {
 
         void check_spawn_window() {
             if (std::optional<WindowModel> window_model;
-                !m_run_window_model.has_value() && (window_model = make_next_window_model())) {
-                swap(window_model, m_run_window_model);
-                m_ui_manager.spawn_window(*m_run_window_model);
-                m_run_window_timeout
-                    = m_ui_manager.set_timeout(calculate_timeout(m_run_window_model->timeout()),
-                        sigc::mem_fun(*this, &Model::on_timeout));
+                !m_run_context.has_value() && (window_model = make_next_window_model())) {
+                m_ui_manager.spawn_window(*window_model);
+                auto timeout_slot = m_ui_manager.set_timeout(calculate_timeout(window_model->timeout()),
+                    sigc::mem_fun(*this, &Model::on_timeout));
+                m_run_context.emplace(*std::move(window_model), timeout_slot);
             }
         }
 
@@ -129,8 +132,7 @@ namespace Askpass {
         }
 
         void on_window_closed() {
-            m_run_window_model.reset();
-            m_run_window_timeout = sigc::scoped_connection();
+            m_run_context.reset();
             check_spawn_window();
         }
 
