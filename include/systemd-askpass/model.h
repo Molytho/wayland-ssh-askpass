@@ -75,6 +75,7 @@ namespace Askpass {
         struct run_context {
             WindowModel window_model;
             sigc::scoped_connection timeout_slot;
+            AskpassFile current_file;
         };
 
         T &m_ui_manager;
@@ -93,9 +94,9 @@ namespace Askpass {
             return std::max<unsigned int>(0, (microseconds / 1000) - current_milli_sec);
         }
 
-        std::optional<WindowModel> make_next_window_model() {
+        std::optional<std::pair<WindowModel, AskpassFile>> make_next_window_model() {
             while (!m_current_askpass_files.empty()) {
-                AskpassFileInterface auto file = m_current_askpass_files.dequeue_file();
+                AskpassFile file = m_current_askpass_files.dequeue_file();
                 std::unique_ptr<SystemdAskpassContext> context;
                 try {
                     context = read_askpass_file(file);
@@ -111,18 +112,19 @@ namespace Askpass {
                     std::cout << "Askpass process already disappeared\n";
                     continue;
                 }
-                return WindowModel(std::move(context));
+                return std::make_pair(WindowModel(std::move(context)), std::move(file));
             }
             return {};
         }
 
         void check_spawn_window() {
-            if (std::optional<WindowModel> window_model;
-                !m_run_context.has_value() && (window_model = make_next_window_model())) {
-                m_ui_manager.spawn_window(*window_model);
-                auto timeout_slot = m_ui_manager.set_timeout(calculate_timeout(window_model->timeout()),
+            if (std::optional<std::pair<WindowModel, AskpassFile>> window_context;
+                !m_run_context.has_value() && (window_context = make_next_window_model())) {
+                auto &[window_model, file] = *window_context;
+                m_ui_manager.spawn_window(window_model);
+                auto timeout_slot = m_ui_manager.set_timeout(calculate_timeout(window_model.timeout()),
                     sigc::mem_fun(*this, &Model::on_timeout));
-                m_run_context.emplace(*std::move(window_model), timeout_slot);
+                m_run_context.emplace(std::move(window_model), timeout_slot, std::move(file));
             }
         }
 
@@ -145,7 +147,13 @@ namespace Askpass {
             m_current_askpass_files.add_file(std::move(file));
         }
 
-        void on_file_deleted(AskpassFile file) { m_current_askpass_files.remove_file(file); }
+        void on_file_deleted(AskpassFile file) {
+            if (m_run_context && file == m_run_context->current_file) {
+                m_ui_manager.close_window();
+            } else {
+                m_current_askpass_files.remove_file(file);
+            }
+        }
 
         void on_file_events_ended() { check_spawn_window(); }
     };
