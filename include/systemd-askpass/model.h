@@ -2,6 +2,7 @@
 #define MODEL_H
 
 #include <cassert>
+#include <iostream>
 #include <optional>
 #include <unordered_set>
 
@@ -71,10 +72,22 @@ namespace Askpass {
         std::optional<WindowModel> m_run_window_model;
         T &m_ui_manager;
 
-        void check_spawn_window() {
-            if (!m_run_window_model.has_value() && !m_current_askpass_files.empty()) {
+        std::optional<WindowModel> make_next_window_model() {
+            while (!m_current_askpass_files.empty()) {
                 AskpassFileInterface auto file = m_current_askpass_files.dequeue_file();
-                m_run_window_model.emplace(read_askpass_file(file));
+                try {
+                    return WindowModel(read_askpass_file(file));
+                } catch (const std::runtime_error &ex) {
+                    std::cerr << "Reading Askpass file failed:\n" << ex.what() << '\n';
+                }
+            }
+            return {};
+        }
+
+        void check_spawn_window() {
+            if (std::optional<WindowModel> window_model;
+                !m_run_window_model.has_value() && (window_model = make_next_window_model())) {
+                swap(window_model, m_run_window_model);
                 m_ui_manager.spawn_window(*m_run_window_model);
             }
         }
