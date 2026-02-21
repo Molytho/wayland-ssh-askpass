@@ -2,6 +2,7 @@
 #define MODEL_H
 
 #include <cassert>
+#include <csignal>
 #include <iostream>
 #include <optional>
 #include <unordered_set>
@@ -75,11 +76,18 @@ namespace Askpass {
         std::optional<WindowModel> make_next_window_model() {
             while (!m_current_askpass_files.empty()) {
                 AskpassFileInterface auto file = m_current_askpass_files.dequeue_file();
+                std::unique_ptr<SystemdAskpassContext> context;
                 try {
-                    return WindowModel(read_askpass_file(file));
+                    context = read_askpass_file(file);
                 } catch (const std::runtime_error &ex) {
                     std::cerr << "Reading Askpass file failed:\n" << ex.what() << '\n';
+                    continue;
                 }
+                if (kill(context->pid(), 0) < 0 && errno == ESRCH) {
+                    std::cout << "Askpass process already disappeared\n";
+                    continue;
+                }
+                return WindowModel(std::move(context));
             }
             return {};
         }

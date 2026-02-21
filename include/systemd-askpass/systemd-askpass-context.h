@@ -10,7 +10,7 @@
 namespace Askpass {
     class SystemdAskpassContext {
         std::string m_message;
-        int m_pid;     // TODO
+        int m_pid;
         wrapper::unique_fd m_answer_socket;
         time_t m_timeout; // TODO
 
@@ -18,6 +18,8 @@ namespace Askpass {
         SystemdAskpassContext(std::string m_message, int m_pid, wrapper::unique_fd m_answer_socket, time_t m_timeout);
 
         constexpr std::string_view message() const noexcept { return m_message; }
+
+        constexpr int pid() const noexcept { return m_pid; }
 
         constexpr int answer_socket() const noexcept { return m_answer_socket.get(); }
 
