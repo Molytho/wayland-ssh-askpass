@@ -73,3 +73,5 @@ executable(
     install_tag: 'systemd-askpass',
     dependencies : systemd_askpass_dependencies
 )
+
+subdir('data/systemd-askpass')

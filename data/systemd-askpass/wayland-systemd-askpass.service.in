@@ -1,0 +1,8 @@
+[Unit]
+Description=Dispatch Password Requests to wayland-systemd-askpass
+
+[Service]
+Type=exec
+ExecStart=@BIN_DIR@/wayland-systemd-askpass
+Restart=on-failure
+Slice=session.slice
