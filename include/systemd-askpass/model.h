@@ -36,8 +36,11 @@ namespace Askpass {
     };
 
     template<class T>
-    concept UiInterface = requires(T &obj, WindowModel &window_model) {
+    concept UiInterface = requires(T &obj, WindowModel &window_model, unsigned int milliseconds,
+        const sigc::slot<bool()> &timeout_func) {
         obj.spawn_window(window_model);
+        obj.close_window();
+        { obj.set_timeout(milliseconds, timeout_func) } -> std::same_as<sigc::connection>;
         { obj.signal_window_closed() } -> std::same_as<sigc::signal<void(void)>>;
     };
 
@@ -68,10 +71,20 @@ namespace Askpass {
     static_assert(AskpassFileInterface<AskpassFile>);
 
     template<UiInterface T>
-    class Model {
+    class Model : public sigc::trackable {
         FileStorage<AskpassFile> m_current_askpass_files;
         std::optional<WindowModel> m_run_window_model;
+        sigc::scoped_connection m_run_window_timeout;
         T &m_ui_manager;
+
+        static unsigned int calculate_timeout(time_t microseconds) {
+            timespec buffer {};
+            if (clock_gettime(CLOCK_MONOTONIC, &buffer) < 0) {
+                std::abort();
+            }
+            time_t current_milli_sec = buffer.tv_sec * 1000 + buffer.tv_nsec / 1000000;
+            return std::max<unsigned int>(0, (microseconds / 1000) - current_milli_sec);
+        }
 
         std::optional<WindowModel> make_next_window_model() {
             while (!m_current_askpass_files.empty()) {
@@ -81,6 +94,10 @@ namespace Askpass {
                     context = read_askpass_file(file);
                 } catch (const std::runtime_error &ex) {
                     std::cerr << "Reading Askpass file failed:\n" << ex.what() << '\n';
+                    continue;
+                }
+                if (calculate_timeout(context->timeout()) <= 0) {
+                    std::cout << "Askpass request already timed out\n";
                     continue;
                 }
                 if (kill(context->pid(), 0) < 0 && errno == ESRCH) {
@@ -97,11 +114,20 @@ namespace Askpass {
                 !m_run_window_model.has_value() && (window_model = make_next_window_model())) {
                 swap(window_model, m_run_window_model);
                 m_ui_manager.spawn_window(*m_run_window_model);
+                m_run_window_timeout
+                    = m_ui_manager.set_timeout(calculate_timeout(m_run_window_model->timeout()),
+                        sigc::mem_fun(*this, &Model::on_timeout));
             }
+        }
+
+        bool on_timeout() {
+            m_ui_manager.close_window();
+            return false;
         }
 
         void on_window_closed() {
             m_run_window_model.reset();
+            m_run_window_timeout = sigc::scoped_connection();
             check_spawn_window();
         }
 

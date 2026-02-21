@@ -1,9 +1,10 @@
 #include "window-model.h"
 
+#include <iostream>
 #include <span>
 #include <string_view>
-#include <sys/uio.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 
 #include <sigc++/signal.h>
 
@@ -18,7 +19,10 @@ namespace {
         };
 
         ssize_t res = writev(socket_fd, vecs.data(), vecs.size());
-        throw_system_error_if(res < 0);
+        throw_system_error_if(res < 0 && errno != ECONNREFUSED);
+        if (res < 0 && errno == ECONNREFUSED) {
+            std::cerr << "Answer socket already disappeared\n";
+        }
     }
 
     void write_answer(int socket_fd, bool success, std::string_view password) {

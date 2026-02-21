@@ -27,6 +27,8 @@ namespace Askpass {
 
         std::string_view message() const noexcept { return m_context->message(); }
 
+        time_t timeout() const noexcept { return m_context->timeout(); }
+
         constexpr ExitCode exit_status() const noexcept { return m_exit_status; }
     };
 } // namespace Askpass

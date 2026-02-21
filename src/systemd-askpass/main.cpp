@@ -40,6 +40,14 @@ public:
         window->present();
     }
 
+    void close_window() {
+        m_open_window->close();
+    }
+
+    sigc::connection set_timeout(unsigned int milliseconds, const sigc::slot<bool()> &func) {
+        return Glib::signal_timeout().connect(func, milliseconds);
+    }
+
     int run(int argc, char *argv[]) {
         m_application->hold();
         return m_application->run(argc, argv);
