@@ -14,8 +14,6 @@ namespace po = boost::program_options;
 namespace {
     constexpr char OptionMessage[]  = "Ask.Message";
     constexpr char OptionPID[]      = "Ask.PID";
-    constexpr char OptionEcho[]     = "Ask.Echo";
-    constexpr char OptionSilent[]   = "Ask.Silent";
     constexpr char OptionSocket[]   = "Ask.Socket";
     constexpr char OptionNotAfter[] = "Ask.NotAfter";
 
@@ -25,8 +23,6 @@ namespace {
         desc.add_options()
             (OptionMessage , po::value<std::string>()->default_value("No message"), "Message to show")
             (OptionPID     , po::value<int>()->required(), "PID of sender")
-            (OptionEcho    , po::value<int>()->default_value(0), "Whether the input should be echoed")
-            (OptionSilent  , po::value<int>()->default_value(0), "Whether the input should indicate input")
             (OptionSocket  , po::value<std::string>()->required(), "The answer socket")
             (OptionNotAfter, po::value<time_t>()->default_value(0), "The timeout");;
         return desc;
@@ -61,9 +57,9 @@ namespace {
 } // namespace
 
 namespace Askpass {
-    SystemdAskpassContext::SystemdAskpassContext(std::string m_message, int m_pid, bool m_echo,
-        bool m_silent, wrapper::unique_fd m_answer_socket, time_t m_timeout) :
-            m_message(std::move(m_message)), m_pid(m_pid), m_echo(m_echo), m_silent(m_silent),
+    SystemdAskpassContext::SystemdAskpassContext(
+        std::string m_message, int m_pid, wrapper::unique_fd m_answer_socket, time_t m_timeout) :
+            m_message(std::move(m_message)), m_pid(m_pid),
             m_answer_socket(std::move(m_answer_socket)), m_timeout(m_timeout) {}
 
     std::unique_ptr<SystemdAskpassContext> SystemdAskpassContext::from_askpass_file(
@@ -76,8 +72,6 @@ namespace Askpass {
 
         return std::make_unique<SystemdAskpassContext>(std::move(vm.at(OptionMessage).as<std::string>()),
             vm.at(OptionPID).as<int>(),
-            vm.at(OptionEcho).as<int>() != 0,
-            vm.at(OptionSilent).as<int>() != 0,
             create_answer_socket(vm.at(OptionSocket).as<std::string>()),
             vm.at(OptionNotAfter).as<time_t>());
     }
