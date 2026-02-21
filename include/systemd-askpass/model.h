@@ -78,6 +78,9 @@ namespace Askpass {
         T &m_ui_manager;
 
         static unsigned int calculate_timeout(time_t microseconds) {
+            if (microseconds == 0) {
+                return 0;
+            }
             timespec buffer {};
             if (clock_gettime(CLOCK_MONOTONIC, &buffer) < 0) {
                 std::abort();
