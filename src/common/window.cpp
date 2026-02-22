@@ -66,7 +66,7 @@ namespace Askpass {
         m_password_entry.property_activates_default().set_value(true);
 
         m_cancel_button.set_label("Cancel");
-        m_cancel_button.signal_clicked().connect(sigc::mem_fun(*this, &Gtk::Window::close));
+        m_cancel_button.signal_clicked().connect(sigc::mem_fun(*this, &Window::on_cancle_button_clicked));
 
         m_ok_button.set_label("Ok");
         m_ok_button.signal_clicked().connect(sigc::mem_fun(*this, &Window::on_ok_button_clicked));
@@ -100,12 +100,6 @@ namespace Askpass {
     void Window::on_realize() {
         Base::on_realize();
         platform_setup(*this);
-        present();
-    }
-
-    bool Window::on_close_request() {
-        emit_failure();
-        return Base::on_close_request();
     }
 
     void Window::on_ok_button_clicked() {
@@ -113,9 +107,14 @@ namespace Askpass {
         close();
     }
 
+    void Window::on_cancle_button_clicked() {
+        emit_failure();
+        close();
+    }
+
     bool Window::on_key_pressed(guint keyval, guint, Gdk::ModifierType) {
         if (keyval == GDK_KEY_Escape) {
-            close();
+            on_cancle_button_clicked();
             return true;
         }
         return false;
