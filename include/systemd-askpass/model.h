@@ -78,7 +78,7 @@ namespace Askpass {
             sigc::scoped_connection timeout_slot {};
 
             run_context(std::unique_ptr<SystemdAskpassContext> askpass_context, AskpassFile file) :
-                    window_model(std::move(askpass_context)), current_file(std::move(file)) {}
+                    window_model(std::move(askpass_context)), current_file(std::move(file)) { }
         };
 
         T &m_ui_manager;

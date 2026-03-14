@@ -10,9 +10,9 @@ namespace wrapper {
         int m_fd;
 
     public:
-        constexpr unique_fd() : m_fd(-1) {}
-        
-        explicit unique_fd(int fd) : m_fd(fd) {}
+        constexpr unique_fd() : m_fd(-1) { }
+
+        explicit unique_fd(int fd) : m_fd(fd) { }
 
         ~unique_fd() noexcept { reset(); }
 
@@ -32,9 +32,7 @@ namespace wrapper {
 
         constexpr int get() const noexcept { return m_fd; }
 
-        friend void swap(unique_fd &lhs, unique_fd &rhs) noexcept {
-            std::swap(lhs.m_fd, rhs.m_fd);
-        }
+        friend void swap(unique_fd &lhs, unique_fd &rhs) noexcept { std::swap(lhs.m_fd, rhs.m_fd); }
     };
 } // namespace wrapper
 
