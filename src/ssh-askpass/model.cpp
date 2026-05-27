@@ -9,6 +9,8 @@
 
 #include <sigc++/signal.h>
 
+#include <unistd.h>
+
 #include "macros.h"
 
 namespace {
